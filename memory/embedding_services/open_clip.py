@@ -14,11 +14,13 @@ class OpenClipEmbeddingService:
     def __init__(
         self,
         model_name: str = config.OPEN_CLIP_MODEL_NAME,
-        pretrained_path: str = config.OPEN_CLIP_PRETRAINED_PATH,
+        pretrained: str = config.OPEN_CLIP_PRETRAINED,
+        cache_dir: str = config.OPEN_CLIP_CACHE_DIR,
         device: str = config.OPEN_CLIP_DEVICE,
     ) -> None:
         self.model_name = model_name
-        self.pretrained_path = Path(pretrained_path)
+        self.pretrained = pretrained
+        self.cache_dir = Path(cache_dir)
         self.device = device
 
         self.model = None
@@ -92,15 +94,12 @@ class OpenClipEmbeddingService:
                 "torch is required for OpenClipEmbeddingService. Install torch first."
             ) from exc
 
-        if not self.pretrained_path.exists():
-            raise FileNotFoundError(
-                f"OpenCLIP checkpoint not found: {self.pretrained_path}. "
-                "Put the checkpoint in the project's models/ folder."
-            )
+        self.cache_dir.mkdir(parents=True, exist_ok=True)
 
         model, _, preprocess = open_clip.create_model_and_transforms(
             self.model_name,
-            pretrained=str(self.pretrained_path),
+            pretrained=self.pretrained,
+            cache_dir=str(self.cache_dir),
         )
         model.eval()
         model = model.to(self.device)
