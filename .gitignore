@@ -21,3 +21,5 @@ thirdparty/ORB_SLAM3/Thirdparty/Sophus/build/
 thirdparty/ORB_SLAM3/Vocabulary/ORBvoc.txt
 
 .DS_Store
+
+test_data/
