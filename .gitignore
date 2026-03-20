@@ -5,8 +5,13 @@ __pycache__/
 .mypy_cache/
 .ruff_cache/
 
+.codex/
+
 build/
 dist/
+models/*
+datasets/*
+
 *.egg-info/
 
 slam/_orbslam3*.so
