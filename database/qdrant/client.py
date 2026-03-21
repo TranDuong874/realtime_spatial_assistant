@@ -86,12 +86,21 @@ class QdrantClientWrapper:
 
     def search(self, query_vector: Sequence[float], limit: int = 10) -> list[Any]:
         self._validate_vector(query_vector)
-        return self.client.search(
+        if hasattr(self.client, "search"):
+            return self.client.search(
+                collection_name=self.collection_name,
+                query_vector=list(query_vector),
+                limit=limit,
+                with_payload=True,
+            )
+
+        response = self.client.query_points(
             collection_name=self.collection_name,
-            query_vector=list(query_vector),
+            query=list(query_vector),
             limit=limit,
             with_payload=True,
         )
+        return list(response.points)
 
     def scroll(self, limit: int = 100) -> list[Any]:
         points, _ = self.client.scroll(
