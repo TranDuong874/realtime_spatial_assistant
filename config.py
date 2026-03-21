@@ -1,6 +1,7 @@
 POSTGRES_DSN = "postgresql://rsa:rsa@localhost:5432/rsa_memory"
 QDRANT_URL = "http://localhost:6333"
-VECTOR_SIZE = 512
+QDRANT_FRAME_COLLECTION = "frame_embeddings"
+VECTOR_SIZE = 768
 
 VIDEO_PATH = "/home/tranduong/dev/realtime_spatial_assistant/test_data/loc5_script4_seq2_rec1/AriaEverydayActivities_1.0.0_loc5_script4_seq2_rec1_preview_rgb.mp4"
 SAMPLE_EVERY_N_FRAMES = 2

@@ -29,8 +29,7 @@ class OpenClipEmbeddingService:
         self.torch = None
 
     def embed_image(self, image: np.ndarray | Image.Image) -> list[float]:
-        embeddings = self.embed_images([image])
-        return embeddings[0]
+        return self.embed_images([image])[0]
 
     def embed_images(self, images: list[np.ndarray | Image.Image]) -> list[list[float]]:
         if not images:
@@ -52,8 +51,7 @@ class OpenClipEmbeddingService:
         return image_features.cpu().tolist()
 
     def embed_text(self, text: str) -> list[float]:
-        embeddings = self.embed_texts([text])
-        return embeddings[0]
+        return self.embed_texts([text])[0]
 
     def embed_texts(self, texts: list[str]) -> list[list[float]]:
         if not texts:
@@ -72,9 +70,6 @@ class OpenClipEmbeddingService:
             text_features = text_features / text_features.norm(dim=-1, keepdim=True)
 
         return text_features.cpu().tolist()
-
-    def embed_video_frame(self, image: np.ndarray | Image.Image) -> list[float]:
-        return self.embed_image(image)
 
     def _load_model(self) -> None:
         if self.model is not None:

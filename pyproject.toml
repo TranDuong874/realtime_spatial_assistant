@@ -15,8 +15,15 @@ dependencies = [
   "pillow>=10.0",
   "psycopg[binary]>=3.1",
   "qdrant-client>=1.9",
+  "sqlalchemy>=2.0",
   "ultralytics>=8.0",
+  "psycopg2>=2.9.11",
 ]
 
 [tool.setuptools.packages.find]
-include = ["memory*", "slam*"]
+include = ["database*", "memory*", "slam*"]
+
+[tool.uv.workspace]
+members = [
+    "test_scripts/mcp/mcp-server-demo",
+]

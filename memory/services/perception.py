@@ -1,23 +1,14 @@
-from collections.abc import Sequence
+from __future__ import annotations
+
 from pathlib import Path
 from typing import Any
 
 import numpy as np
+
 import config
 
 
 class YoloDetectionService:
-    """Small YOLO wrapper for single-frame or batched-frame detection.
-
-    Input:
-    - single frame: `np.ndarray` with shape `(H, W, 3)`
-    - batched frames: `list[np.ndarray]`
-
-    Output:
-    - single frame -> `list[dict]`
-    - batch -> `list[list[dict]]`
-    """
-
     def __init__(
         self,
         model_path: str | Path = config.YOLO_MODEL_PATH,
@@ -31,25 +22,13 @@ class YoloDetectionService:
         self.device = device
         self._model = None
 
-    def run(self, frames: Any) -> Any:
-        if self._is_frame(frames):
-            return self.detect_frame(frames)
-
-        if self._is_batch(frames):
-            return self.detect_frames(list(frames))
-
-        return []
-
     def detect_frame(self, frame: np.ndarray) -> list[dict[str, Any]]:
-        results = self._predict([frame])
-        return results[0]
+        return self.detect_frames([frame])[0]
 
     def detect_frames(self, frames: list[np.ndarray]) -> list[list[dict[str, Any]]]:
         if not frames:
             return []
-        return self._predict(frames)
 
-    def _predict(self, frames: list[np.ndarray]) -> list[list[dict[str, Any]]]:
         model = self._get_model()
         results = model.predict(
             source=frames,
@@ -92,28 +71,15 @@ class YoloDetectionService:
 
         for xyxy, confidence, class_id in zip(xyxy_values, confidence_values, class_values):
             x1, y1, x2, y2 = xyxy
-            width = x2 - x1
-            height = y2 - y1
             class_index = int(class_id)
-
             detections.append(
                 {
                     "class_id": class_index,
                     "class_name": name_map.get(class_index, str(class_index)),
                     "confidence": float(confidence),
                     "bbox_xyxy": [float(x1), float(y1), float(x2), float(y2)],
-                    "bbox_xywh": [float(x1), float(y1), float(width), float(height)],
+                    "bbox_xywh": [float(x1), float(y1), float(x2 - x1), float(y2 - y1)],
                 }
             )
 
         return detections
-
-    def _is_frame(self, value: Any) -> bool:
-        return isinstance(value, np.ndarray) and value.ndim == 3
-
-    def _is_batch(self, value: Any) -> bool:
-        return (
-            isinstance(value, Sequence)
-            and not isinstance(value, (str, bytes))
-            and all(self._is_frame(frame) for frame in value)
-        )

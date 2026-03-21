@@ -1,11 +1,11 @@
-from memory.embedding_services import OpenClipEmbeddingService
-from memory.perception_services import OCRService, SegmentationService, YoloDetectionService
-from memory.schema import FrameInput
+from memory.memory_pipeline import FrameMemoryPipeline
+from memory.services import OpenClipEmbeddingService, YoloDetectionService
+from memory.schema import FrameInput, FrameMemory
 
 __all__ = [
+    "FrameMemoryPipeline",
     "FrameInput",
-    "OCRService",
+    "FrameMemory",
     "OpenClipEmbeddingService",
-    "SegmentationService",
     "YoloDetectionService",
 ]
