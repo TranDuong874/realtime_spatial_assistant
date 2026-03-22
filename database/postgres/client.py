@@ -3,11 +3,11 @@ from __future__ import annotations
 from typing import Any
 
 import config
-from sqlalchemy import create_engine, delete, select
+from sqlalchemy import create_engine, select, text
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import sessionmaker
 
-from database.postgres.models import Base, Clip, Frame, Segment, SegmentClip, SegmentFrame
+from database.postgres.models import Base, Frame, Segment
 
 
 class PostgresClient:
@@ -20,7 +20,9 @@ class PostgresClient:
         Base.metadata.create_all(self.engine)
 
     def reset_db(self) -> None:
-        Base.metadata.drop_all(self.engine)
+        with self.engine.begin() as connection:
+            connection.execute(text("DROP SCHEMA IF EXISTS public CASCADE"))
+            connection.execute(text("CREATE SCHEMA public"))
         Base.metadata.create_all(self.engine)
 
     def upsert_frame(
@@ -30,6 +32,7 @@ class PostgresClient:
         timestamp_ms: int,
         frame_path: str,
         ocr_text: str | None = None,
+        ocr_json: list[dict[str, Any]] | dict[str, Any] | None = None,
         yolo_json: list[dict[str, Any]] | dict[str, Any] | None = None,
         slam_json: dict[str, Any] | None = None,
     ) -> None:
@@ -41,6 +44,7 @@ class PostgresClient:
                     timestamp_ms=timestamp_ms,
                     frame_path=frame_path,
                     ocr_text=ocr_text,
+                    ocr_json=ocr_json,
                     yolo_json=yolo_json,
                     slam_json=slam_json,
                 ).on_conflict_do_update(
@@ -50,38 +54,9 @@ class PostgresClient:
                         "timestamp_ms": timestamp_ms,
                         "frame_path": frame_path,
                         "ocr_text": ocr_text,
+                        "ocr_json": ocr_json,
                         "yolo_json": yolo_json,
                         "slam_json": slam_json,
-                    },
-                )
-            )
-
-    def upsert_clip(
-        self,
-        clip_id: str,
-        start_frame_id: str,
-        end_frame_id: str,
-        start_s: float,
-        end_s: float,
-        feature_path: str,
-    ) -> None:
-        with self.session_factory.begin() as session:
-            session.execute(
-                pg_insert(Clip.__table__).values(
-                    clip_id=clip_id,
-                    start_frame_id=start_frame_id,
-                    end_frame_id=end_frame_id,
-                    start_s=start_s,
-                    end_s=end_s,
-                    feature_path=feature_path,
-                ).on_conflict_do_update(
-                    index_elements=[Clip.clip_id],
-                    set_={
-                        "start_frame_id": start_frame_id,
-                        "end_frame_id": end_frame_id,
-                        "start_s": start_s,
-                        "end_s": end_s,
-                        "feature_path": feature_path,
                     },
                 )
             )
@@ -91,12 +66,17 @@ class PostgresClient:
         segment_id: str,
         start_frame_id: str,
         end_frame_id: str,
+        start_frame_idx: int,
+        end_frame_idx: int,
         start_s: float,
         end_s: float,
         action_text: str,
         score: float,
         verb_label: str | None = None,
         noun_label: str | None = None,
+        rep_frame_start_id: str | None = None,
+        rep_frame_mid_id: str | None = None,
+        rep_frame_end_id: str | None = None,
     ) -> None:
         with self.session_factory.begin() as session:
             session.execute(
@@ -104,89 +84,44 @@ class PostgresClient:
                     segment_id=segment_id,
                     start_frame_id=start_frame_id,
                     end_frame_id=end_frame_id,
+                    start_frame_idx=start_frame_idx,
+                    end_frame_idx=end_frame_idx,
                     start_s=start_s,
                     end_s=end_s,
                     verb_label=verb_label,
                     noun_label=noun_label,
                     action_text=action_text,
                     score=score,
+                    rep_frame_start_id=rep_frame_start_id,
+                    rep_frame_mid_id=rep_frame_mid_id,
+                    rep_frame_end_id=rep_frame_end_id,
                 ).on_conflict_do_update(
                     index_elements=[Segment.segment_id],
                     set_={
                         "start_frame_id": start_frame_id,
                         "end_frame_id": end_frame_id,
+                        "start_frame_idx": start_frame_idx,
+                        "end_frame_idx": end_frame_idx,
                         "start_s": start_s,
                         "end_s": end_s,
                         "verb_label": verb_label,
                         "noun_label": noun_label,
                         "action_text": action_text,
                         "score": score,
+                        "rep_frame_start_id": rep_frame_start_id,
+                        "rep_frame_mid_id": rep_frame_mid_id,
+                        "rep_frame_end_id": rep_frame_end_id,
                     },
                 )
             )
-
-    def replace_segment_frames(
-        self,
-        segment_id: str,
-        frame_refs: list[dict[str, str]],
-    ) -> None:
-        with self.session_factory.begin() as session:
-            session.execute(delete(SegmentFrame).where(SegmentFrame.segment_id == segment_id))
-            if frame_refs:
-                session.execute(
-                    SegmentFrame.__table__.insert(),
-                    [
-                        {
-                            "segment_id": segment_id,
-                            "frame_id": item["frame_id"],
-                            "role": item["role"],
-                        }
-                        for item in frame_refs
-                    ],
-                )
-
-    def replace_segment_clips(
-        self,
-        segment_id: str,
-        clip_ids: list[str],
-    ) -> None:
-        with self.session_factory.begin() as session:
-            session.execute(delete(SegmentClip).where(SegmentClip.segment_id == segment_id))
-            if clip_ids:
-                session.execute(
-                    SegmentClip.__table__.insert(),
-                    [
-                        {
-                            "segment_id": segment_id,
-                            "clip_id": clip_id,
-                        }
-                        for clip_id in clip_ids
-                    ],
-                )
 
     def get_frame(self, frame_id: str) -> Frame | None:
         with self.session_factory() as session:
             return session.get(Frame, frame_id)
 
-    def get_clip(self, clip_id: str) -> Clip | None:
-        with self.session_factory() as session:
-            return session.get(Clip, clip_id)
-
     def get_segment(self, segment_id: str) -> Segment | None:
         with self.session_factory() as session:
             return session.get(Segment, segment_id)
-
-    def get_segment_frames(self, segment_id: str) -> list[SegmentFrame]:
-        with self.session_factory() as session:
-            return session.scalars(
-                select(SegmentFrame).where(SegmentFrame.segment_id == segment_id)
-            ).all()
-
-    def get_segment_clips(self, segment_id: str) -> list[SegmentClip]:
-        with self.session_factory() as session:
-            return session.scalars(
-                select(SegmentClip).where(SegmentClip.segment_id == segment_id)
-            ).all()
 
     def get_frames(self, frame_ids: list[str]) -> list[Frame]:
         if not frame_ids:

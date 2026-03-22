@@ -36,6 +36,7 @@ def run() -> None:
         raise SystemExit("Set VIDEO_PATH in config.py first.")
 
     video_path = Path(config.VIDEO_PATH).expanduser().resolve()
+    video_id = video_path.stem
     if not video_path.exists():
         raise FileNotFoundError(f"Video file not found: {video_path}")
 
@@ -83,7 +84,11 @@ def run() -> None:
             frame_path=str(frame_path),
             yolo_json=detections,
         )
-        storage_pipeline.store_frame(frame_record, openclip_embedding=embedding)
+        storage_pipeline.store_frame(
+            frame_record,
+            openclip_embedding=embedding,
+            video_id=video_id,
+        )
 
         processed += 1
         elapsed_seconds = time.perf_counter() - started_at

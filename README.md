@@ -25,22 +25,19 @@ video
 
 Postgres is the source of truth for metadata and grounding:
 
-- `frames(frame_id, frame_idx, timestamp_ms, frame_path, ocr_text, yolo_json, slam_json)`
-- `clips(clip_id, start_frame_id, end_frame_id, start_s, end_s, feature_path)`
-- `segments(segment_id, start_frame_id, end_frame_id, start_s, end_s, verb_label, noun_label, action_text, score)`
-- `segment_frames(segment_id, frame_id, role)`
-- `segment_clips(segment_id, clip_id)`
+- `frames(frame_id, frame_idx, timestamp_ms, frame_path, ocr_text, ocr_json, yolo_json, slam_json)`
+- `segments(segment_id, start_frame_id, end_frame_id, start_frame_idx, end_frame_idx, start_s, end_s, verb_label, noun_label, action_text, score, rep_frame_start_id, rep_frame_mid_id, rep_frame_end_id)`
 
 Qdrant is semantic retrieval only and always points back to Postgres:
 
 - `frame_openclip` with payload `{frame_id}`
-- `segment_semantic` with payload `{segment_id}`
+- `action_segment` with payload `{segment_id}`
 
 Current implementation status:
 
 - frame storage + `frame_openclip` retrieval path is implemented
-- clip and segment storage APIs are implemented in `pipeline/storage_pipeline.py`
-- ActionFormer segment persistence is not wired into the runner yet
+- segment storage + `action_segment` retrieval path is implemented
+- SlowFast clips are processing artifacts on disk and are not stored in Postgres
 
 ## Quick Start
 
@@ -141,13 +138,14 @@ Expected feature contract:
 
 ## OCR Setup
 
-The OCR service uses a lightweight English PP-OCRv4 mobile configuration and prefers GPU when available:
+The OCR service uses a conservative English PP-OCRv5 mobile configuration and prefers GPU when available:
 
 ```python
-PADDLEOCR_LANGUAGE = "en"
-PADDLEOCR_OCR_VERSION = "PP-OCRv4"
-PADDLEOCR_USE_GPU = True
-PADDLEOCR_USE_ANGLE_CLS = False
+PADDLEOCR_TEXT_DETECTION_MODEL_NAME = "PP-OCRv5_mobile_det"
+PADDLEOCR_TEXT_RECOGNITION_MODEL_NAME = "en_PP-OCRv5_mobile_rec"
+PADDLEOCR_TEXT_DET_THRESH = 0.4
+PADDLEOCR_TEXT_DET_BOX_THRESH = 0.7
+PADDLEOCR_TEXT_REC_SCORE_THRESH = 0.85
 ```
 
 `services/paddle_ocr.py` returns per-line text detections with confidence and polygon points, and exposes `merge_text(...)` to collapse detections into one string for `frames.ocr_text`.

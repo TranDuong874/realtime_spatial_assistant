@@ -11,6 +11,7 @@ class FrameInput:
     timestamp_ms: int
     frame_path: str
     ocr_text: str | None = None
+    ocr_json: list[dict[str, Any]] | dict[str, Any] | None = None
     yolo_json: list[dict[str, Any]] | dict[str, Any] | None = None
     slam_json: dict[str, Any] | None = None
 

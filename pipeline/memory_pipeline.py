@@ -44,6 +44,7 @@ class FrameMemoryPipeline:
             timestamp_ms=frame_memory.frame.timestamp_ms,
             frame_path=frame_memory.frame.frame_path,
             ocr_text=frame_memory.frame.ocr_text,
+            ocr_json=frame_memory.frame.ocr_json,
             yolo_json=frame_memory.yolo_detections or frame_memory.frame.yolo_json,
             slam_json=frame_memory.frame.slam_json,
         )
@@ -64,6 +65,7 @@ class FrameMemoryPipeline:
             "timestamp_s": frame.timestamp_ms / 1000.0,
             "frame_path": frame.frame_path,
             "ocr_text": frame.ocr_text,
+            "ocr_json": frame.ocr_json,
             "yolo_json": frame.yolo_json,
             "slam_json": frame.slam_json,
         }

@@ -11,12 +11,9 @@ from schema.action import (
 )
 from schema.frame_memory import FrameInput, FrameMemory
 from schema.storage import (
-    ClipRecord,
     FrameRecord,
-    SegmentClipRecord,
-    SegmentFrameRecord,
+    PooledWindowRecord,
     SegmentRecord,
-    StoredSegment,
 )
 
 __all__ = [
@@ -27,14 +24,11 @@ __all__ = [
     "ActionWindowInput",
     "ActionWindowPrediction",
     "ActionWindowResult",
-    "ClipRecord",
     "FrameRecord",
     "FrameInput",
     "FrameMemory",
     "LabeledActionSegment",
-    "SegmentClipRecord",
-    "SegmentFrameRecord",
+    "PooledWindowRecord",
     "SegmentRecord",
     "SlowFastClipEmbedding",
-    "StoredSegment",
 ]

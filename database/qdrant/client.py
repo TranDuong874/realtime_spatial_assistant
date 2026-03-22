@@ -4,7 +4,16 @@ from typing import Any, Sequence
 
 import config
 from qdrant_client import QdrantClient
-from qdrant_client.models import Distance, PointIdsList, PointStruct, VectorParams
+from qdrant_client.models import (
+    Distance,
+    FieldCondition,
+    Filter,
+    MatchValue,
+    PointIdsList,
+    PointStruct,
+    Range,
+    VectorParams,
+)
 
 
 class QdrantClientWrapper:
@@ -12,18 +21,21 @@ class QdrantClientWrapper:
         self,
         url: str = config.QDRANT_URL,
         frame_collection_name: str = config.QDRANT_FRAME_COLLECTION,
-        segment_collection_name: str = config.QDRANT_SEGMENT_COLLECTION,
+        action_collection_name: str = config.QDRANT_ACTION_COLLECTION,
+        window_collection_name: str = config.QDRANT_WINDOW_COLLECTION,
         vector_size: int = config.OPENCLIP_VECTOR_SIZE,
     ) -> None:
         self.url = url
         self.frame_collection_name = frame_collection_name
-        self.segment_collection_name = segment_collection_name
+        self.action_collection_name = action_collection_name
+        self.window_collection_name = window_collection_name
         self.vector_size = vector_size
         self.client = QdrantClient(url=self.url, check_compatibility=False)
 
     def init_collections(self, recreate: bool = False) -> None:
         self._init_collection(self.frame_collection_name, recreate=recreate)
-        self._init_collection(self.segment_collection_name, recreate=recreate)
+        self._init_collection(self.action_collection_name, recreate=recreate)
+        self._init_collection(self.window_collection_name, recreate=recreate)
 
     def reset_collections(self) -> None:
         self.init_collections(recreate=True)
@@ -35,24 +47,47 @@ class QdrantClientWrapper:
         self,
         frame_id: str,
         vector: Sequence[float],
+        payload: dict[str, Any] | None = None,
     ) -> Any:
+        frame_payload = {"frame_id": frame_id}
+        if payload:
+            frame_payload.update(payload)
         return self._upsert_point(
             collection_name=self.frame_collection_name,
             point_id=frame_id,
             vector=vector,
-            payload={"frame_id": frame_id},
+            payload=frame_payload,
         )
 
     def upsert_segment_point(
         self,
         segment_id: str,
         vector: Sequence[float],
+        payload: dict[str, Any] | None = None,
     ) -> Any:
+        segment_payload = {"segment_id": segment_id}
+        if payload:
+            segment_payload.update(payload)
         return self._upsert_point(
-            collection_name=self.segment_collection_name,
+            collection_name=self.action_collection_name,
             point_id=segment_id,
             vector=vector,
-            payload={"segment_id": segment_id},
+            payload=segment_payload,
+        )
+
+    def upsert_window_point(
+        self,
+        window_id: str,
+        vector: Sequence[float],
+        payload: dict[str, Any],
+    ) -> Any:
+        window_payload = {"window_id": window_id}
+        window_payload.update(payload)
+        return self._upsert_point(
+            collection_name=self.window_collection_name,
+            point_id=window_id,
+            vector=vector,
+            payload=window_payload,
         )
 
     def upsert_point(
@@ -102,7 +137,10 @@ class QdrantClientWrapper:
         return self._get_point(self.frame_collection_name, frame_id, with_vector=with_vector)
 
     def get_segment_point(self, segment_id: str, with_vector: bool = True) -> Any | None:
-        return self._get_point(self.segment_collection_name, segment_id, with_vector=with_vector)
+        return self._get_point(self.action_collection_name, segment_id, with_vector=with_vector)
+
+    def get_window_point(self, window_id: str, with_vector: bool = True) -> Any | None:
+        return self._get_point(self.window_collection_name, window_id, with_vector=with_vector)
 
     def get_point(self, point_id: str, with_vector: bool = True) -> Any | None:
         return self.get_frame_point(point_id, with_vector=with_vector)
@@ -128,22 +166,47 @@ class QdrantClientWrapper:
             with_vectors=with_vector,
         )
 
-    def search_frames(self, query_vector: Sequence[float], limit: int = 10) -> list[Any]:
-        return self._search(self.frame_collection_name, query_vector, limit=limit)
+    def search_frames(
+        self,
+        query_vector: Sequence[float],
+        limit: int = 10,
+        query_filter: Filter | None = None,
+    ) -> list[Any]:
+        return self._search(self.frame_collection_name, query_vector, limit=limit, query_filter=query_filter)
 
-    def search_segments(self, query_vector: Sequence[float], limit: int = 10) -> list[Any]:
-        return self._search(self.segment_collection_name, query_vector, limit=limit)
+    def search_segments(
+        self,
+        query_vector: Sequence[float],
+        limit: int = 10,
+        query_filter: Filter | None = None,
+    ) -> list[Any]:
+        return self._search(self.action_collection_name, query_vector, limit=limit, query_filter=query_filter)
+
+    def search_windows(
+        self,
+        query_vector: Sequence[float],
+        limit: int = 10,
+        query_filter: Filter | None = None,
+    ) -> list[Any]:
+        return self._search(self.window_collection_name, query_vector, limit=limit, query_filter=query_filter)
 
     def search(self, query_vector: Sequence[float], limit: int = 10) -> list[Any]:
         return self.search_frames(query_vector, limit=limit)
 
-    def _search(self, collection_name: str, query_vector: Sequence[float], limit: int = 10) -> list[Any]:
+    def _search(
+        self,
+        collection_name: str,
+        query_vector: Sequence[float],
+        limit: int = 10,
+        query_filter: Filter | None = None,
+    ) -> list[Any]:
         self._validate_vector(query_vector)
         if hasattr(self.client, "search"):
             return self.client.search(
                 collection_name=collection_name,
                 query_vector=list(query_vector),
                 limit=limit,
+                query_filter=query_filter,
                 with_payload=True,
             )
 
@@ -151,6 +214,7 @@ class QdrantClientWrapper:
             collection_name=collection_name,
             query=list(query_vector),
             limit=limit,
+            query_filter=query_filter,
             with_payload=True,
         )
         return list(response.points)
@@ -171,7 +235,10 @@ class QdrantClientWrapper:
         return self._delete_point(self.frame_collection_name, frame_id)
 
     def delete_segment_point(self, segment_id: str) -> Any:
-        return self._delete_point(self.segment_collection_name, segment_id)
+        return self._delete_point(self.action_collection_name, segment_id)
+
+    def delete_window_point(self, window_id: str) -> Any:
+        return self._delete_point(self.window_collection_name, window_id)
 
     def _delete_point(self, collection_name: str, point_id: str) -> Any:
         return self.client.delete(
@@ -208,3 +275,17 @@ class QdrantClientWrapper:
             raise ValueError(
                 f"Expected vector size {self.vector_size}, got {len(vector)}."
             )
+
+    @staticmethod
+    def build_frame_scope_filter(
+        *,
+        video_id: str,
+        start_frame_idx: int,
+        end_frame_idx: int,
+    ) -> Filter:
+        return Filter(
+            must=[
+                FieldCondition(key="video_id", match=MatchValue(value=video_id)),
+                FieldCondition(key="frame_idx", range=Range(gte=start_frame_idx, lte=end_frame_idx)),
+            ]
+        )
