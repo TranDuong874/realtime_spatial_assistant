@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from database.postgres.client import PostgresClient
 from database.qdrant.client import QdrantClientWrapper
-from memory.schema import FrameInput, FrameMemory
+from schema import FrameInput, FrameMemory
 
 
 class FrameMemoryPipeline:

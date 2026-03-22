@@ -1,45 +1,36 @@
 # realtime_spatial_assistant
 
-This repo now has two layers:
+Current focus:
 
-- `slam`: Python bindings for the vendored `thirdparty/ORB_SLAM3` tree
-- `memory`: a minimal Postgres + Qdrant recall layer for egocentric video memory
+- `services/slowfast.py`: EPIC-KITCHENS SlowFast clip feature extraction
+- `services/actionformer.py`: EPIC-KITCHENS ActionFormer verb/noun segment inference
+- `schema/action.py`: typed clip, window, segment, and action-sequence schemas
+- `pipeline/action_pipeline.py`: action post-processing, merging, and sequence assembly
+- `services/open_clip.py`: image embeddings
+- `services/yolo.py`: frame detections
+- `pipeline/` + `database/`: Postgres and Qdrant storage path
 
-The intended architecture is:
+Current development pipeline:
 
 ```text
-Client -> server -> SLAM-tagged frames -> enrichment -> embeddings -> recall
+video
+  -> 32-frame SlowFast clips, stride 16, target 30 FPS
+  -> 2304-d clip features
+  -> rolling ActionFormer verb/noun windows
+  -> merged action segments
 ```
-
-Storage responsibilities:
-
-- PostgreSQL stores the real data: `clips`, `frames`, `poses`, `frame_enrichments`
-- Qdrant stores only vectors and lightweight references like `frame_id` and `clip_id`
-- Query flow is always `Qdrant -> PostgreSQL`
 
 ## Quick Start
 
-Build the vendored native dependencies and the Python extension:
+Create a virtual environment and install the repo:
 
 ```bash
-cd realtime_spatial_assistant
-MAKE_JOBS=2 bash ./build_orbslam3_python.sh
+uv venv
+source .venv/bin/activate
+uv pip install -e .
 ```
 
-Run the import smoke test:
-
-```bash
-cd realtime_spatial_assistant
-python3 test_slam_import.py
-```
-
-Install the Python dependencies for the memory layer:
-
-```bash
-python3 -m pip install -e .
-```
-
-Start local Postgres and Qdrant:
+If you want the frame-storage pipeline, start local Postgres and Qdrant:
 
 ```bash
 docker run -d \
@@ -57,98 +48,111 @@ docker run -d \
   qdrant/qdrant:v1.13.4
 ```
 
-Configure the memory layer:
+## Installed Models
 
-```bash
-export MEMORY_POSTGRES_DSN=postgresql://rsa:rsa@localhost:5432/rsa_memory
-export MEMORY_QDRANT_URL=http://localhost:6333
-export MEMORY_VECTOR_SIZE=512
+Current local checkpoints in active use:
+
+```text
+models/yolo26n.pt
+models/slowfast/SlowFast.pyth
+models/actionformer/epic_slowfast_verb_reproduce/epoch_020.pth.tar
+models/actionformer/epic_slowfast_noun_reproduce/epoch_020.pth.tar
 ```
 
-## Package
+Supporting repos in active use:
+
+```text
+thirdparty/epic-kitchens-slowfast
+thirdparty/actionformer_release
+datasets/epic-kitchens-100-annotations
+```
+
+## SlowFast Setup
+
+The local SlowFast service uses the EPIC-KITCHENS model and clip config:
+
+- 32 input frames
+- stride 16 frames
+- target FPS 30
+- output embedding size 2304
+
+Relevant config in `config.py`:
 
 ```python
-import slam
-
-system = slam.System(
-    "thirdparty/ORB_SLAM3/Vocabulary/ORBvoc.txt",
-    "path/to/settings.yaml",
-    slam.Sensor.IMU_STEREO,
-    use_viewer=False,
-)
+SLOWFAST_REPO_PATH = "thirdparty/epic-kitchens-slowfast"
+SLOWFAST_CHECKPOINT_PATH = "models/slowfast/SlowFast.pyth"
+SLOWFAST_CLIP_NUM_FRAMES = 32
+SLOWFAST_CLIP_TARGET_FPS = 30.0
+SLOWFAST_CLIP_STRIDE_FRAMES = 16
 ```
 
-Exports:
+## ActionFormer Setup
 
-- `slam.System`
-- `slam.Sensor`
-- `slam.ImuMeasurement`
+The local ActionFormer service is now a thin model adapter. It accepts an `ActionWindowInput`,
+runs inference, and returns typed raw segment predictions. Segment filtering, label resolution,
+merging, and action-sequence building live in `pipeline/action_pipeline.py`.
 
-### `memory`
+The local ActionFormer service loads the EPIC-KITCHENS verb and noun models from:
 
 ```python
-from memory import ClipInput, FrameInput, MemorySystem, PoseInput
-
-memory = MemorySystem.from_env()
-memory.initialize()
-
-clip = ClipInput(id="clip_42", start_time=1712345600, end_time=1712345650)
-pose = PoseInput(id=1, tx=0.1, ty=0.2, tz=0.3)
-frame = FrameInput(
-    id="frame_123",
-    timestamp=1712345678,
-    clip_id=clip.id,
-    pose=pose,
-    image_path="/tmp/frame_123.jpg",
-)
-
-memory.insert_clip(clip)
-memory.insert_frame(frame, embedding=[0.0] * 512)
-
-clip_hits = memory.search_clips(query_embedding=[0.0] * 512, limit=5)
-records = memory.get_frames([hit.clip_id for hit in clip_hits])
+ACTIONFORMER_EPIC_VERB_CONFIG_PATH = "thirdparty/actionformer_release/configs/epic_slowfast_verb.yaml"
+ACTIONFORMER_EPIC_NOUN_CONFIG_PATH = "thirdparty/actionformer_release/configs/epic_slowfast_noun.yaml"
+ACTIONFORMER_EPIC_VERB_CHECKPOINT_PATH = "models/actionformer/epic_slowfast_verb_reproduce/epoch_020.pth.tar"
+ACTIONFORMER_EPIC_NOUN_CHECKPOINT_PATH = "models/actionformer/epic_slowfast_noun_reproduce/epoch_020.pth.tar"
 ```
 
-The placeholder perception pipeline is already wired into storage. Right now it
-writes empty YOLO / segmentation / OCR results into Postgres, and later you can
-swap in real model-backed services without changing the schema or query path.
+The service consumes SlowFast features, not raw video.
 
-### `main_pipeline.py`
+Expected feature contract:
 
-For early development, `main_pipeline.py` now supports an MP4-first ingest path:
+- feature dim 2304
+- feat stride 16
+- feat window 32 frames
+- default FPS 30
+
+## Test Runners
+
+Frame pipeline:
 
 ```bash
-export MEMORY_POSTGRES_DSN=postgresql://rsa:rsa@localhost:5432/rsa_memory
-export MEMORY_QDRANT_URL=http://localhost:6333
-export MEMORY_VECTOR_SIZE=512
-
-python3 main_pipeline.py /path/to/video.mp4 \
-  --sample-every-n-frames 30 \
-  --max-frames 100 \
-  --frame-output-dir ./sampled_frames
+python3 main.py
 ```
 
-What it does:
+SlowFast-only video feature test:
 
-- reads a raw MP4 with OpenCV
-- samples frames at a fixed stride
-- creates a simple development embedding for each frame
-- writes frame rows into Postgres
-- writes frame vectors into Qdrant
-- computes one clip vector as the mean of sampled frame vectors
+```bash
+python3 test_scripts/slowfast_video_test.py
+```
 
-This gives you a working end-to-end memory ingest path before SLAM, YOLO, OCR,
-or segmentation are integrated.
+Streaming SlowFast + ActionFormer console test with annotated output video:
 
-## Docs
+```bash
+PYTHONUNBUFFERED=1 ./.venv/bin/python test_scripts/slowfast_actionformer_video_test.py
+```
 
-- `docs/API.md`: Python API reference for `slam`
-- `docs/BUILD.md`: build prerequisites, build flow, rebuild notes
-- `docs/MEMORY.md`: Postgres + Qdrant setup and memory query flow
+Useful flags:
+
+```bash
+--video-path /abs/path/to/video.mp4
+--score-threshold 0.25
+--min-duration-seconds 0.8
+--max-segments-per-window 4
+--max-clips 60
+--write-video
+```
+
+## Output Artifacts
+
+The streaming test writes outputs under the chosen `--output-dir`:
+
+- `summary.json`
+- `window_results.json`
+- `merged_segments.json`
+- `action_sequence.txt`
+- `annotated_actions.mp4` when `--write-video` is enabled
 
 ## Notes
 
-- The build defaults to `MAKE_JOBS=2` because ORB-SLAM3 is memory-heavy.
-- The extension binary is generated at `slam/_orbslam3*.so`.
-- The vendored ORB-SLAM3 native build products are treated as generated files and are ignored by `.gitignore`.
-- In the memory layer, Postgres is the source of truth and Qdrant is only the vector index.
+- SlowFast is currently the runtime bottleneck in the streaming test.
+- ActionFormer inference is feature-based temporal localization over SlowFast embeddings.
+- EPIC label names are resolved from `datasets/epic-kitchens-100-annotations/EPIC_100_verb_classes.csv` and `EPIC_100_noun_classes.csv`.

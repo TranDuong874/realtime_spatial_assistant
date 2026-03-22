@@ -7,7 +7,9 @@ import uuid
 import cv2
 
 import config
-from memory import FrameInput, FrameMemoryPipeline, OpenClipEmbeddingService, YoloDetectionService
+from pipeline import FrameMemoryPipeline
+from schema import FrameInput
+from services import OpenClipEmbeddingService, YoloDetectionService
 
 
 def build_speed_metrics(

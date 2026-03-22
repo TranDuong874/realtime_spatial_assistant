@@ -17,6 +17,30 @@ OPEN_CLIP_PRETRAINED = "datacomp_xl_s13b_b90k"
 OPEN_CLIP_CACHE_DIR = "models"
 OPEN_CLIP_DEVICE = "cuda"
 
+SLOWFAST_REPO_PATH = "thirdparty/epic-kitchens-slowfast"
+SLOWFAST_CHECKPOINT_PATH = "models/slowfast/SlowFast.pyth"
+SLOWFAST_DEVICE = "cuda"
+SLOWFAST_CLIP_NUM_FRAMES = 32
+SLOWFAST_CLIP_TARGET_FPS = 30.0
+SLOWFAST_CLIP_STRIDE_FRAMES = 16
+SLOWFAST_BATCH_SIZE = 1
+SLOWFAST_MAX_CLIPS = None
+
+ACTIONFORMER_REPO_PATH = "thirdparty/actionformer_release"
+ACTIONFORMER_DEVICE = "cuda"
+ACTIONFORMER_DEFAULT_FPS = 30.0
+ACTIONFORMER_FEAT_STRIDE = 16
+ACTIONFORMER_FEAT_NUM_FRAMES = 32
+ACTIONFORMER_INPUT_DIM = 2304
+ACTIONFORMER_EPIC_VERB_CONFIG_PATH = "thirdparty/actionformer_release/configs/epic_slowfast_verb.yaml"
+ACTIONFORMER_EPIC_NOUN_CONFIG_PATH = "thirdparty/actionformer_release/configs/epic_slowfast_noun.yaml"
+ACTIONFORMER_EPIC_VERB_CHECKPOINT_PATH = "models/actionformer/epic_slowfast_verb_reproduce/epoch_020.pth.tar"
+ACTIONFORMER_EPIC_NOUN_CHECKPOINT_PATH = "models/actionformer/epic_slowfast_noun_reproduce/epoch_020.pth.tar"
+
+ACTIONFORMER_CONFIG_PATH = "thirdparty/actionformer_release/configs/ego4d_egovlp.yaml"
+ACTIONFORMER_CHECKPOINT_PATH = "models/actionformer/ego4d_egovlp_reproduce/epoch_010.pth.tar"
+TBN_CHECKPOINT_PATH = "models/tbn/TBN-epic-kitchens-100.pth"
+
 # Backup if ViT-L-14 runs out of VRAM:
 # OPEN_CLIP_MODEL_NAME = "ViT-B-16"
 # OPEN_CLIP_PRETRAINED = "datacomp_xl_s13b_b90k"
