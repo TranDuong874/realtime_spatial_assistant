@@ -6,10 +6,25 @@ from typing import Any
 
 @dataclass(slots=True, frozen=True)
 class FrameInput:
-    id: str
+    frame_id: str
+    frame_idx: int
     timestamp_ms: int
     frame_path: str
-    metadata: dict[str, Any] = field(default_factory=dict)
+    ocr_text: str | None = None
+    yolo_json: list[dict[str, Any]] | dict[str, Any] | None = None
+    slam_json: dict[str, Any] | None = None
+
+    @property
+    def id(self) -> str:
+        return self.frame_id
+
+    @property
+    def timestamp_s(self) -> float:
+        return self.timestamp_ms / 1000.0
+
+    @property
+    def metadata(self) -> dict[str, Any]:
+        return {}
 
 
 @dataclass(slots=True, frozen=True)

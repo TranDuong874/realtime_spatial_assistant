@@ -7,6 +7,7 @@ Current focus:
 - `schema/action.py`: typed clip, window, segment, and action-sequence schemas
 - `pipeline/action_pipeline.py`: action post-processing, merging, and sequence assembly
 - `services/open_clip.py`: image embeddings
+- `services/paddle_ocr.py`: lightweight GPU OCR
 - `services/yolo.py`: frame detections
 - `pipeline/` + `database/`: Postgres and Qdrant storage path
 
@@ -20,6 +21,27 @@ video
   -> merged action segments
 ```
 
+## Storage Design
+
+Postgres is the source of truth for metadata and grounding:
+
+- `frames(frame_id, frame_idx, timestamp_ms, frame_path, ocr_text, yolo_json, slam_json)`
+- `clips(clip_id, start_frame_id, end_frame_id, start_s, end_s, feature_path)`
+- `segments(segment_id, start_frame_id, end_frame_id, start_s, end_s, verb_label, noun_label, action_text, score)`
+- `segment_frames(segment_id, frame_id, role)`
+- `segment_clips(segment_id, clip_id)`
+
+Qdrant is semantic retrieval only and always points back to Postgres:
+
+- `frame_openclip` with payload `{frame_id}`
+- `segment_semantic` with payload `{segment_id}`
+
+Current implementation status:
+
+- frame storage + `frame_openclip` retrieval path is implemented
+- clip and segment storage APIs are implemented in `pipeline/storage_pipeline.py`
+- ActionFormer segment persistence is not wired into the runner yet
+
 ## Quick Start
 
 Create a virtual environment and install the repo:
@@ -28,6 +50,13 @@ Create a virtual environment and install the repo:
 uv venv
 source .venv/bin/activate
 uv pip install -e .
+```
+
+For GPU OCR, install a matching PaddlePaddle GPU wheel for your CUDA stack as well:
+
+```bash
+pip install paddleocr
+# install the matching paddlepaddle-gpu wheel separately for your machine
 ```
 
 If you want the frame-storage pipeline, start local Postgres and Qdrant:
@@ -109,6 +138,19 @@ Expected feature contract:
 - feat stride 16
 - feat window 32 frames
 - default FPS 30
+
+## OCR Setup
+
+The OCR service uses a lightweight English PP-OCRv4 mobile configuration and prefers GPU when available:
+
+```python
+PADDLEOCR_LANGUAGE = "en"
+PADDLEOCR_OCR_VERSION = "PP-OCRv4"
+PADDLEOCR_USE_GPU = True
+PADDLEOCR_USE_ANGLE_CLS = False
+```
+
+`services/paddle_ocr.py` returns per-line text detections with confidence and polygon points, and exposes `merge_text(...)` to collapse detections into one string for `frames.ocr_text`.
 
 ## Test Runners
 

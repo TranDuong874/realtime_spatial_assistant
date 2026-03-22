@@ -20,7 +20,7 @@ class FrameMemoryPipeline:
         if self.qdrant is None:
             self.qdrant = QdrantClientWrapper()
         self.postgres.init_db()
-        self.qdrant.init_collection(recreate=recreate_qdrant_collection)
+        self.qdrant.init_collections(recreate=recreate_qdrant_collection)
 
     def create_frame_memory(
         self,
@@ -39,20 +39,15 @@ class FrameMemoryPipeline:
             raise RuntimeError("Call initialize() before store_frame_memory().")
 
         self.postgres.upsert_frame(
-            frame_id=frame_memory.frame.id,
+            frame_id=frame_memory.frame.frame_id,
+            frame_idx=frame_memory.frame.frame_idx,
             timestamp_ms=frame_memory.frame.timestamp_ms,
             frame_path=frame_memory.frame.frame_path,
-            metadata=frame_memory.frame.metadata,
+            ocr_text=frame_memory.frame.ocr_text,
+            yolo_json=frame_memory.yolo_detections or frame_memory.frame.yolo_json,
+            slam_json=frame_memory.frame.slam_json,
         )
-        self.postgres.upsert_frame_yolo(
-            frame_id=frame_memory.frame.id,
-            detections=frame_memory.yolo_detections,
-        )
-        self.qdrant.upsert_point(
-            point_id=frame_memory.frame.id,
-            vector=frame_memory.embedding,
-            payload={"frame_id": frame_memory.frame.id},
-        )
+        self.qdrant.upsert_frame_point(frame_memory.frame.frame_id, frame_memory.embedding)
 
     def hydrate_frame(self, frame_id: str) -> dict | None:
         if self.postgres is None:
@@ -62,20 +57,22 @@ class FrameMemoryPipeline:
         if frame is None:
             return None
 
-        yolo = self.postgres.get_frame_yolo(frame_id)
         return {
-            "frame_id": frame.id,
+            "frame_id": frame.frame_id,
+            "frame_idx": frame.frame_idx,
             "timestamp_ms": frame.timestamp_ms,
+            "timestamp_s": frame.timestamp_ms / 1000.0,
             "frame_path": frame.frame_path,
-            "metadata": frame.frame_metadata,
-            "yolo_detections": [] if yolo is None else yolo.detections,
+            "ocr_text": frame.ocr_text,
+            "yolo_json": frame.yolo_json,
+            "slam_json": frame.slam_json,
         }
 
     def search_frames(self, query_embedding: list[float], limit: int = 10) -> list[dict]:
         if self.qdrant is None:
             raise RuntimeError("Qdrant client is not initialized.")
 
-        hits = self.qdrant.search(query_embedding, limit=limit)
+        hits = self.qdrant.search_frames(query_embedding, limit=limit)
         results: list[dict] = []
 
         for hit in hits:

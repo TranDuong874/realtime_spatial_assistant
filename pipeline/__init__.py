@@ -1,6 +1,7 @@
 from pipeline.action_pipeline import ActionRecognitionPipeline
+from pipeline.storage_pipeline import EvaluationStoragePipeline
 
-__all__ = ["ActionRecognitionPipeline"]
+__all__ = ["ActionRecognitionPipeline", "EvaluationStoragePipeline"]
 
 try:
     from pipeline.memory_pipeline import FrameMemoryPipeline

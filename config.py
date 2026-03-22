@@ -1,7 +1,9 @@
 POSTGRES_DSN = "postgresql://rsa:rsa@localhost:5432/rsa_memory"
 QDRANT_URL = "http://localhost:6333"
-QDRANT_FRAME_COLLECTION = "frame_embeddings"
-VECTOR_SIZE = 768
+QDRANT_FRAME_COLLECTION = "frame_openclip"
+QDRANT_SEGMENT_COLLECTION = "segment_semantic"
+OPENCLIP_VECTOR_SIZE = 768
+VECTOR_SIZE = OPENCLIP_VECTOR_SIZE
 
 VIDEO_PATH = "/home/tranduong/dev/realtime_spatial_assistant/test_data/loc5_script4_seq2_rec1/AriaEverydayActivities_1.0.0_loc5_script4_seq2_rec1_preview_rgb.mp4"
 SAMPLE_EVERY_N_FRAMES = 2
@@ -16,6 +18,17 @@ OPEN_CLIP_MODEL_NAME = "ViT-L-14"
 OPEN_CLIP_PRETRAINED = "datacomp_xl_s13b_b90k"
 OPEN_CLIP_CACHE_DIR = "models"
 OPEN_CLIP_DEVICE = "cuda"
+
+PADDLEOCR_LANGUAGE = "en"
+PADDLEOCR_OCR_VERSION = "PP-OCRv5"
+PADDLEOCR_USE_GPU = True
+PADDLEOCR_USE_TEXTLINE_ORIENTATION = False
+PADDLEOCR_TEXT_DETECTION_MODEL_NAME = "PP-OCRv5_mobile_det"
+PADDLEOCR_TEXT_RECOGNITION_MODEL_NAME = "en_PP-OCRv5_mobile_rec"
+PADDLEOCR_TEXT_DET_THRESH = 0.4
+PADDLEOCR_TEXT_DET_BOX_THRESH = 0.7
+PADDLEOCR_TEXT_REC_SCORE_THRESH = 0.85
+PADDLEOCR_MIN_TEXT_CHARS = 2
 
 SLOWFAST_REPO_PATH = "thirdparty/epic-kitchens-slowfast"
 SLOWFAST_CHECKPOINT_PATH = "models/slowfast/SlowFast.pyth"

@@ -7,8 +7,8 @@ import uuid
 import cv2
 
 import config
-from pipeline import FrameMemoryPipeline
-from schema import FrameInput
+from pipeline import EvaluationStoragePipeline
+from schema import FrameRecord
 from services import OpenClipEmbeddingService, YoloDetectionService
 
 
@@ -44,8 +44,8 @@ def run() -> None:
 
     yolo = YoloDetectionService()
     open_clip = OpenClipEmbeddingService()
-    memory_pipeline = FrameMemoryPipeline()
-    memory_pipeline.initialize()
+    storage_pipeline = EvaluationStoragePipeline()
+    storage_pipeline.initialize()
 
     capture = cv2.VideoCapture(str(video_path))
     if not capture.isOpened():
@@ -68,7 +68,7 @@ def run() -> None:
             frame_index += 1
             continue
 
-        timestamp_ms = int((frame_index / fps) * 1000.0)
+        timestamp_ms = int(round((frame_index / fps) * 1000.0))
         frame_name = f"frame_{frame_index:06d}"
         frame_id = str(uuid.uuid5(uuid.NAMESPACE_URL, f"{video_path}:{frame_index}"))
         frame_path = frames_dir / f"{frame_name}.jpg"
@@ -76,18 +76,14 @@ def run() -> None:
 
         detections = yolo.detect_frame(frame)
         embedding = open_clip.embed_image(frame)
-        frame_record = FrameInput(
-            id=frame_id,
+        frame_record = FrameRecord(
+            frame_id=frame_id,
+            frame_idx=frame_index,
             timestamp_ms=timestamp_ms,
             frame_path=str(frame_path),
-            metadata={"source_video_path": str(video_path)},
+            yolo_json=detections,
         )
-        frame_memory = memory_pipeline.create_frame_memory(
-            frame=frame_record,
-            embedding=embedding,
-            yolo_detections=detections,
-        )
-        memory_pipeline.store_frame_memory(frame_memory)
+        storage_pipeline.store_frame(frame_record, openclip_embedding=embedding)
 
         processed += 1
         elapsed_seconds = time.perf_counter() - started_at
